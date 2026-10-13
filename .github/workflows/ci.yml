@@ -1,0 +1,76 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: {POSTGRES_DB: osint, POSTGRES_USER: osint, POSTGRES_PASSWORD: osint}
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd="pg_isready -U osint -d osint" --health-interval=5s
+          --health-timeout=5s --health-retries=20
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+    env:
+      DATABASE_URL: postgresql+psycopg://osint:osint@localhost:5432/osint
+      REDIS_URL: redis://localhost:6379/0
+      ALLOW_TEST_SQLITE: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install -e 'apps/api[dev]'
+      - run: alembic upgrade head
+      - run: ruff check apps/api
+      - run: mypy apps/api/app
+      - run: |
+          nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 >/tmp/api.log 2>&1 &
+          nohup celery -A app.celery_app:celery_app worker --loglevel=WARNING --concurrency=1 >/tmp/worker.log 2>&1 &
+          nohup celery -A app.celery_app:celery_app beat --loglevel=WARNING --schedule=/tmp/beat >/tmp/beat.log 2>&1 &
+          python - <<'PY'
+          import time, urllib.request
+          for _ in range(30):
+              try:
+                  urllib.request.urlopen('http://127.0.0.1:8000/live', timeout=1)
+                  break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit(open('/tmp/api.log').read())
+          PY
+      - run: pytest apps/api/tests -q
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci
+        working-directory: apps/web
+      - run: npm run typecheck
+        working-directory: apps/web
+      - run: npm run build
+        working-directory: apps/web
+      - run: |
+          npx playwright install --with-deps chromium
+          nohup npm start -- --hostname 127.0.0.1 >/tmp/web.log 2>&1 &
+          python - <<'PY'
+          import time, urllib.request
+          for _ in range(30):
+              try:
+                  urllib.request.urlopen('http://127.0.0.1:3000/login', timeout=1)
+                  break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit(open('/tmp/web.log').read())
+          PY
+          npx playwright test
+        working-directory: apps/web

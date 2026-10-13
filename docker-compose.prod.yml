@@ -1,0 +1,63 @@
+# Requer Docker Compose >= 2.24.4 (tag !reset).
+services:
+  migrate:
+    environment:
+      ENVIRONMENT: production
+      COOKIE_SECURE: 'true'
+      CONNECTOR_SECRET_KEY: ${CONNECTOR_SECRET_KEY:?gere CONNECTOR_SECRET_KEY antes do deploy}
+      CORS_ORIGINS: https://${HOSTNAME:?configure HOSTNAME}
+      TRUSTED_HOSTS: ${HOSTNAME},api,web,localhost,127.0.0.1
+  api:
+    ports: !reset []
+    environment:
+      ENVIRONMENT: production
+      COOKIE_SECURE: 'true'
+      CONNECTOR_SECRET_KEY: ${CONNECTOR_SECRET_KEY:?gere CONNECTOR_SECRET_KEY antes do deploy}
+      CORS_ORIGINS: https://${HOSTNAME:?configure HOSTNAME}
+      TRUSTED_HOSTS: ${HOSTNAME},api,web,localhost,127.0.0.1
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+  worker:
+    environment:
+      ENVIRONMENT: production
+      COOKIE_SECURE: 'true'
+      CONNECTOR_SECRET_KEY: ${CONNECTOR_SECRET_KEY:?gere CONNECTOR_SECRET_KEY antes do deploy}
+      CORS_ORIGINS: https://${HOSTNAME:?configure HOSTNAME}
+      TRUSTED_HOSTS: ${HOSTNAME},api,web,localhost,127.0.0.1
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+  beat:
+    environment:
+      ENVIRONMENT: production
+      COOKIE_SECURE: 'true'
+      CONNECTOR_SECRET_KEY: ${CONNECTOR_SECRET_KEY:?gere CONNECTOR_SECRET_KEY antes do deploy}
+      CORS_ORIGINS: https://${HOSTNAME:?configure HOSTNAME}
+      TRUSTED_HOSTS: ${HOSTNAME},api,web,localhost,127.0.0.1
+  web:
+    ports: !reset []
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      HOSTNAME: ${HOSTNAME:?configure HOSTNAME}
+      ACME_EMAIL: ${ACME_EMAIL:?configure ACME_EMAIL}
+    ports:
+      - 80:80
+      - 443:443
+      - 443:443/udp
+    volumes:
+      - ./infrastructure/deployment/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+volumes:
+  caddy_data:
+  caddy_config:
