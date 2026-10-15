@@ -4,6 +4,7 @@
 
 - O endpoint `/ready` agora verifica PostgreSQL e Redis e retorna `503` quando uma dependência não está disponível.
 - O CI usa `npm ci` e aguarda o servidor web antes dos testes Playwright, eliminando a condição de corrida na inicialização.
+- Corrigida a configuração do Alembic e identificada formalmente a revisão inicial, permitindo `upgrade` e `downgrade` reproduzíveis.
 - Revalidados Ruff, mypy, compilação Python, build/lint/typecheck do frontend e configuração do Compose.
 
 ## 0.1.0 — desenvolvimento inicial (2026-10-12)

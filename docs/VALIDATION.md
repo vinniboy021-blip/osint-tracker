@@ -6,7 +6,7 @@ Registro inicial, 2026-10-12. Nenhum check é aprovado por pressuposição. Este
 |---|---|
 | Compose config/build/start | `docker compose config --quiet` passou com `POSTGRES_PASSWORD` temporária; build/start bloqueado no ambiente porque o socket Docker retornou `operation not permitted` |
 | Readiness de PostgreSQL/Redis | Implementado: `/ready` verifica as duas dependências e retorna `503` com diagnóstico quando alguma falha |
-| Alembic PostgreSQL upgrade/downgrade/upgrade | A executar |
+| Alembic upgrade/downgrade/upgrade | Passou localmente com SQLite de teste; o job CI executa o mesmo ciclo em PostgreSQL |
 | Ruff/mypy/pytest | Ruff e mypy passaram; 41 testes unitários/contrato passaram. Testes que usam `TestClient` ficam bloqueados pelo runtime anyio deste executor |
 | ESLint/TypeScript/Next build | Passou: `npm ci`, `npm run typecheck`, `npm run lint` e `npm run build` |
 | Playwright fluxo real de API | A executar |
