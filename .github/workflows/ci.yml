@@ -59,6 +59,34 @@ jobs:
         with: {node-version: '22'}
       - run: npm ci
         working-directory: apps/web
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Validate Compose files
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+          CONNECTOR_SECRET_KEY: QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=
+          HOSTNAME: osint.example.org
+          ACME_EMAIL: ci@example.org
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+      - name: Build production images
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+          CONNECTOR_SECRET_KEY: QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=
+        run: docker compose build --pull
+      - name: Exercise backup and restore
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+          CONNECTOR_SECRET_KEY: QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=
+        run: |
+          trap 'docker compose down -v' EXIT
+          docker compose up -d
+          docker compose ps --wait
+          python scripts/backup.py /tmp/osint-tracker-backup
+          python scripts/restore.py /tmp/osint-tracker-backup --replace-data
+          docker compose ps --status running
       - run: npm audit --audit-level=high
         working-directory: apps/web
       - run: npm run typecheck

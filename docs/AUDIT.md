@@ -7,7 +7,9 @@ Escopo: backend FastAPI, workers Celery, PostgreSQL, Redis, frontend Next.js, Do
 
 A revisão encontrou e corrigiu um vazamento de escopo entre investigações, uma autorização administrativa incompleta, um problema de exclusão em cascata de evidências e vulnerabilidades conhecidas nas dependências Python e JavaScript. Também foram corrigidos o estágio de build do frontend e o alvo local de auditoria do Makefile.
 
-O fluxo funcional foi exercitado com PostgreSQL e Redis reais: autenticação, criação de investigação, coleta DNS pública, persistência de observações, execução recorrente por Celery Beat/worker e atualização do monitor. O repositório ainda não deve ser tratado como certificado para produção: não foi realizado pentest independente, DAST externo ou teste de restauração em ambiente de desastre.
+O fluxo funcional foi exercitado com PostgreSQL e Redis reais: autenticação, criação de investigação, coleta DNS pública, persistência de observações, execução recorrente por Celery Beat/worker e atualização do monitor. O CI agora também constrói as imagens e executa backup/restauração em Compose. O repositório ainda não deve ser tratado como certificado para produção: não foi realizado pentest independente ou DAST externo.
+
+O build local de imagens foi tentado com Docker. O contexto do frontend foi reduzido com `.dockerignore`; a compilação não concluiu neste executor porque o sandbox de build não possui saída de rede para o índice npm/PyPI. O CI GitHub executa os builds e terminou com sucesso nos commits anteriores.
 
 ## Achados corrigidos
 
@@ -42,7 +44,7 @@ O fluxo funcional foi exercitado com PostgreSQL e Redis reais: autenticação, c
 ## Riscos residuais e próximos passos
 
 1. Não houve pentest independente, DAST autenticado ou revisão externa de configuração de uma implantação pública.
-2. O teste de backup e restauração ainda precisa ser executado em um ambiente descartável com PostgreSQL e armazenamento de evidências, incluindo restauração após falha.
+2. O ensaio automatizado de backup/restauração está no job de containers do CI; uma execução de desastre com volumes e armazenamento externos ainda deve ser feita antes do primeiro deploy público.
 3. A integração Meta depende de credenciais e permissões oficiais; não é declarada funcional sem elas. O adaptador Kali/MCP continua opcional e não concede privilégios de execução arbitrária.
 4. O endpoint Prometheus está bloqueado no Caddy e deve continuar protegido pela rede/edge em produção; métricas não devem ser expostas diretamente à Internet.
 5. A migração inicial usa `Base.metadata.create_all`; as próximas alterações devem ser migrações Alembic explícitas para garantir rollback e revisão de esquema.

@@ -12,7 +12,7 @@ Registro atualizado em 2026-10-29. Nenhum check é aprovado por pressuposição;
 | Playwright fluxo real de API | Workflow CI configurado; execução depende do runner GitHub |
 | Coleta pública remota e persistência | DNS de `example.com` coletado e persistido com sucesso |
 | Monitor Beat/worker sem ação manual | Passou com Celery Beat, Redis, worker e PostgreSQL reais |
-| Backup/restore | Scripts presentes; ensaio de restauração de desastre ainda pendente |
+| Backup/restore | Job de containers do CI executa backup e restauração com PostgreSQL e volume de evidências; ensaio de desastre externo ainda pendente |
 | Auditoria de dependências | `pip-audit`, Bandit e `npm audit` passaram sem achados bloqueadores |
 
 Validação executada nesta revisão: dependências Python foram instaladas no `.venv`; `ruff check apps/api`, `mypy apps/api/app`, compilação Python, importação da aplicação com OpenAPI, 50 testes, migrações em PostgreSQL, readiness real, coleta DNS, monitor Celery, validação do Caddy e frontend (`typecheck`, `lint` e `build`) passaram. O build da imagem API não completou neste executor porque o isolamento de build do pip não recebeu acesso de rede; o Dockerfile já atualiza `pip/setuptools` para instalações normais. O fluxo Playwright permanece delegado ao CI.
