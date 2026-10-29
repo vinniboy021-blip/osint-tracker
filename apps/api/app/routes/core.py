@@ -2,7 +2,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.auth import audit, current_user, hash_password, investigation_access, require_admin
@@ -14,6 +14,7 @@ from app.models import (
     Connector,
     Entity,
     Investigation,
+    InvestigationMember,
     Observation,
     ThreatIndicator,
     Timeline,
@@ -35,6 +36,16 @@ def page(db, q, skip=0, limit=50):
         "items": [dump(x) for x in db.scalars(q.offset(skip).limit(limit)).all()],
         "total": db.scalar(select(func.count()).select_from(q.subquery())) or 0,
     }
+
+
+def allowed_investigations(db: Session, user: User):
+    """Return the investigation scope visible to a user for aggregate/list endpoints."""
+    if user.role == "admin":
+        return select(Investigation.id)
+    membership = select(InvestigationMember.investigation_id).where(InvestigationMember.user_id == user.id)
+    return select(Investigation.id).where(
+        or_(Investigation.owner_id == user.id, Investigation.id.in_(membership))
+    )
 
 
 class InvestigationIn(BaseModel):
@@ -86,20 +97,30 @@ def metrics():
 
 @router.get("/dashboard")
 def dashboard(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    iq = (
-        select(Investigation).where(Investigation.owner_id == user.id)
-        if user.role != "admin"
-        else select(Investigation)
-    )
+    allowed = allowed_investigations(db, user)
     return {
-        "investigations": db.scalar(select(func.count()).select_from(iq.subquery())) or 0,
-        "observations": db.scalar(select(func.count()).select_from(Observation)) or 0,
-        "alerts": db.scalar(select(func.count()).select_from(Alert).where(Alert.is_read.is_(False))) or 0,
-        "entities": db.scalar(select(func.count()).select_from(Entity)) or 0,
+        "investigations": db.scalar(select(func.count()).select_from(allowed.subquery())) or 0,
+        "observations": db.scalar(
+            select(func.count()).select_from(Observation).where(Observation.investigation_id.in_(allowed))
+        )
+        or 0,
+        "alerts": db.scalar(
+            select(func.count())
+            .select_from(Alert)
+            .where(Alert.is_read.is_(False), Alert.investigation_id.in_(allowed))
+        )
+        or 0,
+        "entities": db.scalar(
+            select(func.count()).select_from(Entity).where(Entity.investigation_id.in_(allowed))
+        )
+        or 0,
         "jobs_failed": db.scalar(
             select(func.count())
             .select_from(CollectionJob)
-            .where(CollectionJob.status.in_(["failed", "dead_letter"]))
+            .where(
+                CollectionJob.status.in_(["failed", "dead_letter"]),
+                CollectionJob.investigation_id.in_(allowed),
+            )
         )
         or 0,
         "connectors_healthy": db.scalar(
@@ -138,9 +159,13 @@ def global_search(
         observation_query = observation_query.where(Observation.investigation_id == scope)
         indicator_query = indicator_query.where(ThreatIndicator.investigation_id == scope)
     else:
-        entity_query = entity_query.limit(limit)
-        observation_query = observation_query.limit(limit)
-        indicator_query = indicator_query.limit(limit)
+        entity_query = entity_query.where(Entity.investigation_id.in_(allowed_investigations(db, user)))
+        observation_query = observation_query.where(
+            Observation.investigation_id.in_(allowed_investigations(db, user))
+        )
+        indicator_query = indicator_query.where(
+            ThreatIndicator.investigation_id.in_(allowed_investigations(db, user))
+        )
     return {
         "entities": [dump(x) for x in db.scalars(entity_query.limit(limit))],
         "observations": [dump(x) for x in db.scalars(observation_query.limit(limit))],
@@ -154,7 +179,7 @@ def investigations(
 ):
     q = select(Investigation)
     if user.role != "admin":
-        q = q.where(Investigation.owner_id == user.id)
+        q = q.where(Investigation.id.in_(allowed_investigations(db, user)))
     return page(db, q, skip, limit)
 
 
@@ -248,6 +273,8 @@ def alerts(
     if investigation_id:
         investigation_access(db, user, investigation_id)
         q = q.where(Alert.investigation_id == investigation_id)
+    else:
+        q = q.where(Alert.investigation_id.in_(allowed_investigations(db, user)))
     return page(db, q.order_by(Alert.created_at.desc()), skip, limit)
 
 
@@ -300,6 +327,8 @@ def audit_log(
     if investigation_id:
         investigation_access(db, user, investigation_id)
         q = q.where(AuditLog.investigation_id == investigation_id)
+    else:
+        q = q.where(AuditLog.investigation_id.in_(allowed_investigations(db, user)))
     return page(db, q)
 
 
@@ -321,5 +350,5 @@ def create_user(body: UserIn, _: User = Depends(require_admin), db: Session = De
 
 
 @router.get("/admin/connectors")
-def connectors(_: User = Depends(current_user), db: Session = Depends(get_db)):
+def connectors(_: User = Depends(require_admin), db: Session = Depends(get_db)):
     return page(db, select(Connector))

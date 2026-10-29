@@ -1,20 +1,20 @@
 # Registro de validação
 
-Registro inicial, 2026-10-12. Nenhum check é aprovado por pressuposição. Este arquivo será atualizado com comandos executados, resultado e limitações observadas após integração dos módulos.
+Registro atualizado em 2026-10-29. Nenhum check é aprovado por pressuposição; cada item abaixo corresponde a um comando ou fluxo executado.
 
 | Check | Estado inicial |
 |---|---|
-| Compose config/build/start | `docker compose config --quiet` passou com `POSTGRES_PASSWORD` temporária; build/start bloqueado no ambiente porque o socket Docker retornou `operation not permitted` |
+| Compose config/build/start | `docker compose config --quiet` passou; PostgreSQL e Redis iniciaram. O build completo da API depende de acesso de rede do BuildKit ao índice Python neste executor. |
 | Readiness de PostgreSQL/Redis | Implementado: `/ready` verifica as duas dependências e retorna `503` com diagnóstico quando alguma falha |
-| Alembic upgrade/downgrade/upgrade | Passou localmente com SQLite de teste; o job CI executa o mesmo ciclo em PostgreSQL |
-| Ruff/mypy/pytest | Ruff e mypy passaram; 41 testes unitários/contrato passaram. Testes que usam `TestClient` ficam bloqueados pelo runtime anyio deste executor |
-| ESLint/TypeScript/Next build | Passou: `npm ci`, `npm run typecheck`, `npm run lint` e `npm run build` |
-| Playwright fluxo real de API | A executar |
-| Coleta pública remota e persistência | A executar |
-| Monitor Beat/worker sem ação manual | A executar |
-| Backup/restore | A executar |
-| Auditoria de dependências | A executar no CI/release |
+| Alembic upgrade/downgrade/upgrade | Passou em PostgreSQL real, incluindo `alembic check` |
+| Ruff/mypy/pytest | Ruff e mypy passaram; 49 testes passaram |
+| ESLint/TypeScript/Next build | Passou com Next.js 16.4.3 |
+| Playwright fluxo real de API | Workflow CI configurado; execução depende do runner GitHub |
+| Coleta pública remota e persistência | DNS de `example.com` coletado e persistido com sucesso |
+| Monitor Beat/worker sem ação manual | Passou com Celery Beat, Redis, worker e PostgreSQL reais |
+| Backup/restore | Scripts presentes; ensaio de restauração de desastre ainda pendente |
+| Auditoria de dependências | `pip-audit`, Bandit e `npm audit` passaram sem achados bloqueadores |
 
-Validação executada nesta revisão: dependências Python foram instaladas no `.venv`; `ruff check apps/api`, `mypy apps/api/app`, `python -m compileall apps/api/app`, importação da aplicação com OpenAPI, 30 testes unitários/contrato selecionados e o frontend (`typecheck`, `lint` e `build`) passaram. O Docker continua indisponível no executor. A criação de `TestClient` bloqueia neste runtime mesmo para uma aplicação FastAPI vazia; os testes de API devem ser executados no CI.
+Validação executada nesta revisão: dependências Python foram instaladas no `.venv`; `ruff check apps/api`, `mypy apps/api/app`, compilação Python, importação da aplicação com OpenAPI, 49 testes, migrações em PostgreSQL, readiness real, coleta DNS, monitor Celery e frontend (`typecheck`, `lint` e `build`) passaram. O build da imagem API não completou neste executor porque o isolamento de build do pip não recebeu acesso de rede; o Dockerfile já atualiza `pip/setuptools` para instalações normais. O fluxo Playwright permanece delegado ao CI.
 
 Integrações que exigem credenciais oficiais Meta e modelo local não são marcadas validadas sem essas dependências. Testes de contrato usam fixtures explicitamente identificadas.

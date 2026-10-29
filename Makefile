@@ -48,6 +48,7 @@ lint:
 	$(PYTHON) -m mypy apps/api/app
 	cd apps/web && npm run lint && npm run typecheck
 audit:
-	$(PYTHON) -m pip_audit
+	XDG_CACHE_HOME=$${XDG_CACHE_HOME:-/tmp/osint-tracker-cache} $(PYTHON) -m pip_audit --local
+	$(PYTHON) -m bandit -r apps/api/app -q --severity-level medium
 	cd apps/web && npm audit --audit-level=high
 check: lint test

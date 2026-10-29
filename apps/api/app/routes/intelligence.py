@@ -536,8 +536,8 @@ def evidence_delete(evidence_id: str, db: DB, user: Actor):
     ):
         if evidence_id in relation.evidence_ids:
             relation.evidence_ids = [ref for ref in relation.evidence_ids if ref != evidence_id]
-    for version in versions:
-        db.delete(version)
+    # EvidenceVersion rows use ON DELETE CASCADE; deleting them explicitly before
+    # the parent causes duplicate DELETE bookkeeping under SQLAlchemy/PostgreSQL.
     db.delete(evidence)
     db.commit()
     storage = LocalStorage(settings.evidence_path)

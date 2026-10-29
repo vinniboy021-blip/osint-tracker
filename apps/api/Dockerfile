@@ -7,8 +7,8 @@ RUN groupadd --gid 10001 osint && useradd --uid 10001 --gid osint --no-create-ho
 COPY apps/api/pyproject.toml ./pyproject.toml
 COPY apps/api/app ./app
 RUN --mount=type=secret,id=proxy_ca \
-    if [ -f /run/secrets/proxy_ca ]; then PIP_CERT=/run/secrets/proxy_ca pip install --no-cache-dir .; \
-    else pip install --no-cache-dir .; fi
+    if [ -f /run/secrets/proxy_ca ]; then PIP_CERT=/run/secrets/proxy_ca pip install --no-cache-dir --upgrade pip setuptools && PIP_CERT=/run/secrets/proxy_ca pip install --no-cache-dir .; \
+    else pip install --no-cache-dir --upgrade pip setuptools && pip install --no-cache-dir .; fi
 COPY alembic.ini ./alembic.ini
 COPY migrations ./migrations
 USER osint

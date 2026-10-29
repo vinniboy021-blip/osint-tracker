@@ -12,6 +12,7 @@ from typing import Any
 import httpx
 
 from app.config import settings
+from app.connectors.security import validate_public_url
 
 
 def deliver(alert: Any, recipient: str = "") -> dict[str, Any]:
@@ -37,6 +38,10 @@ def deliver(alert: Any, recipient: str = "") -> dict[str, Any]:
             smtp.send_message(message)
         results["email"] = "sent"
     if settings.alert_webhook_url:
+        # Webhook destinations are deployment configuration, but still validate them
+        # before opening a server-side request to prevent accidental SSRF through a
+        # compromised or misconfigured environment.
+        validate_public_url(settings.alert_webhook_url)
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str).encode()
         signature = hmac.new(settings.alert_webhook_secret.encode(), body, hashlib.sha256).hexdigest()
         response = httpx.post(

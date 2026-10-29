@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Auditoria profunda: corrigido isolamento entre investigações em agregados, busca, alertas e auditoria; rota administrativa de conectores passou a exigir RBAC; webhooks passaram a rejeitar destinos internos.
+- Dependências Python e Next.js atualizadas e auditadas com `pip-audit`, Bandit e `npm audit` sem vulnerabilidades conhecidas.
+- Validados PostgreSQL/Redis reais, migrações reversíveis, coleta DNS, Celery Beat/worker e monitor recorrente; relatório detalhado em `docs/AUDIT.md`.
 - O endpoint `/ready` agora verifica PostgreSQL e Redis e retorna `503` quando uma dependência não está disponível.
 - O CI usa `npm ci` e aguarda o servidor web antes dos testes Playwright, eliminando a condição de corrida na inicialização.
 - Corrigida a configuração do Alembic e identificada formalmente a revisão inicial, permitindo `upgrade` e `downgrade` reproduzíveis.

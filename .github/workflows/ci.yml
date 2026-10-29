@@ -26,12 +26,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
+      - run: python -m pip install --upgrade pip
       - run: python -m pip install -e 'apps/api[dev]'
       - run: alembic upgrade head
       - run: alembic downgrade base
       - run: alembic upgrade head
       - run: ruff check apps/api
       - run: mypy apps/api/app
+      - run: XDG_CACHE_HOME=/tmp/.cache pip-audit --local
+      - run: bandit -r apps/api/app -q --severity-level medium
       - run: |
           nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 >/tmp/api.log 2>&1 &
           nohup celery -A app.celery_app:celery_app worker --loglevel=WARNING --concurrency=1 >/tmp/worker.log 2>&1 &
@@ -55,6 +58,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: '22'}
       - run: npm ci
+        working-directory: apps/web
+      - run: npm audit --audit-level=high
         working-directory: apps/web
       - run: npm run typecheck
         working-directory: apps/web
