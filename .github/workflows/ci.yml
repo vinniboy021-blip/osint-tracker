@@ -83,10 +83,17 @@ jobs:
         run: |
           trap 'docker compose down -v' EXIT
           docker compose up -d
-          docker compose ps --wait
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8000/ready >/dev/null && curl --fail --silent http://127.0.0.1:3000/login >/dev/null; then
+              break
+            fi
+            if [ "$attempt" = 30 ]; then docker compose ps; docker compose logs --tail=100 api web migrate; exit 1; fi
+            sleep 2
+          done
           python scripts/backup.py /tmp/osint-tracker-backup
           python scripts/restore.py /tmp/osint-tracker-backup --replace-data
-          docker compose ps --status running
+          curl --fail --silent http://127.0.0.1:8000/ready >/dev/null
+          curl --fail --silent http://127.0.0.1:3000/login >/dev/null
       - run: npm audit --audit-level=high
         working-directory: apps/web
       - run: npm run typecheck
