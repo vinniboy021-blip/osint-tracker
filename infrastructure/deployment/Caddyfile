@@ -9,7 +9,8 @@
         Referrer-Policy no-referrer
         -Server
     }
-    @privateMetrics path /metrics /api/metrics
+    # Prometheus output is operationally sensitive and must stay off the public edge.
+    @privateMetrics path /metrics* /api/metrics*
     respond @privateMetrics 404
     reverse_proxy web:3000
 }

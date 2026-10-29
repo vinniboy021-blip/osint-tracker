@@ -5,7 +5,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.auth import audit, current_user, hash_password, investigation_access, require_admin
+from app.auth import (
+    audit,
+    current_user,
+    hash_password,
+    investigation_access,
+    owner_access,
+    require_admin,
+    user_dict,
+)
 from app.db import get_db
 from app.models import (
     Alert,
@@ -74,6 +82,17 @@ class UserIn(BaseModel):
     email: str
     password: str = Field(min_length=12)
     role: str = "analyst"
+
+
+class MemberIn(BaseModel):
+    user_id: str | None = None
+    email: str | None = None
+    role: str = "viewer"
+
+    def resolve_identifier(self) -> str:
+        if bool(self.user_id) == bool(self.email):
+            raise ValueError("Informe user_id ou email")
+        return self.user_id or self.email or ""
 
 
 @router.get("/health/live")
@@ -198,6 +217,82 @@ def create_investigation(
 @router.get("/investigations/{id}")
 def get_investigation(id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     return dump(investigation_access(db, user, id))
+
+
+@router.get("/investigations/{id}/members")
+def investigation_members(id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    investigation_access(db, user, id)
+    members = db.scalars(select(InvestigationMember).where(InvestigationMember.investigation_id == id)).all()
+    owner = db.scalar(select(Investigation).where(Investigation.id == id))
+    result = []
+    for member in members:
+        member_user = db.get(User, member.user_id)
+        if member_user:
+            result.append({**dump(member), "user": user_dict(member_user)})
+    if owner and not any(member["user_id"] == owner.owner_id for member in result):
+        owner_user = db.get(User, owner.owner_id)
+        if owner_user:
+            result.insert(
+                0,
+                {
+                    "id": None,
+                    "investigation_id": id,
+                    "user_id": owner.owner_id,
+                    "role": "owner",
+                    "user": user_dict(owner_user),
+                },
+            )
+    return {"items": result, "total": len(result)}
+
+
+@router.post("/investigations/{id}/members", status_code=201)
+def add_investigation_member(
+    id: str, body: MemberIn, user: User = Depends(current_user), db: Session = Depends(get_db)
+):
+    investigation = owner_access(db, user, id)
+    if body.role not in {"editor", "viewer"}:
+        raise HTTPException(422, "Papel de investigação inválido")
+    try:
+        identifier = body.resolve_identifier()
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    target = db.scalar(
+        select(User).where(User.id == identifier)
+    ) if body.user_id else db.scalar(select(User).where(User.email == identifier.lower()))
+    if not target or not target.is_active:
+        raise HTTPException(404, "Usuário não encontrado")
+    if target.id == investigation.owner_id:
+        raise HTTPException(409, "O responsável já possui papel de proprietário")
+    member = db.scalar(
+        select(InvestigationMember).where(
+            InvestigationMember.investigation_id == id, InvestigationMember.user_id == target.id
+        )
+    )
+    if member:
+        member.role = body.role
+    else:
+        member = InvestigationMember(investigation_id=id, user_id=target.id, role=body.role)
+        db.add(member)
+    audit(db, user, "investigation.member.upsert", "investigation_member", member.id, id)
+    db.commit()
+    return {**dump(member), "user": user_dict(target)}
+
+
+@router.delete("/investigations/{id}/members/{member_user_id}", status_code=204)
+def remove_investigation_member(
+    id: str, member_user_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)
+) -> None:
+    owner_access(db, user, id)
+    member = db.scalar(
+        select(InvestigationMember).where(
+            InvestigationMember.investigation_id == id, InvestigationMember.user_id == member_user_id
+        )
+    )
+    if not member:
+        raise HTTPException(404, "Membro não encontrado")
+    db.delete(member)
+    audit(db, user, "investigation.member.remove", "investigation_member", member.id, id)
+    db.commit()
 
 
 @router.post("/entities", status_code=201)
@@ -334,7 +429,8 @@ def audit_log(
 
 @router.get("/admin/users")
 def users(_: User = Depends(require_admin), db: Session = Depends(get_db)):
-    return page(db, select(User))
+    records = db.scalars(select(User).order_by(User.created_at.desc())).all()
+    return {"items": [user_dict(record) for record in records], "total": len(records)}
 
 
 @router.post("/admin/users", status_code=201)

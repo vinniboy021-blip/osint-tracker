@@ -20,10 +20,12 @@ O fluxo funcional foi exercitado com PostgreSQL e Redis reais: autenticação, c
 | AUD-05 | Média | Build de produção do frontend omitia dependências de desenvolvimento necessárias ao TypeScript/lint/build. | Dockerfile usa `npm ci` no estágio de build e mantém apenas o artefato standalone no runtime. |
 | AUD-06 | Baixa | `make audit` tentava gravar cache em diretório não gravável no executor. | Cache direcionado para `XDG_CACHE_HOME` configurável, com fallback em `/tmp`. |
 | AUD-07 | Média | Webhooks configurados no servidor podiam causar requisições para destinos internos em caso de configuração comprometida. | Destino passa pela mesma validação HTTPS/porta 443/endereço público usada pelos conectores antes do POST. |
+| AUD-08 | Média | O bloqueio de métricas no Caddy não cobria o caminho montado `/metrics/prometheus`. | Matcher atualizado para bloquear `/metrics*` e `/api/metrics*` na borda pública. |
+| AUD-09 | Média | O modelo de colaboradores existia, mas não havia API para o proprietário gerenciar membros. | Adicionados endpoints autenticados para listar, adicionar, atualizar e remover membros; respostas nunca incluem hashes de senha. |
 
 ## Evidências executadas
 
-- `pytest apps/api/tests -q`: 49 testes aprovados.
+- `pytest apps/api/tests -q`: 50 testes aprovados.
 - `ruff check apps/api`: aprovado.
 - `mypy apps/api/app`: aprovado.
 - `pip-audit --local`: nenhuma vulnerabilidade conhecida.
@@ -35,17 +37,18 @@ O fluxo funcional foi exercitado com PostgreSQL e Redis reais: autenticação, c
 - Coleta real: consulta DNS de `example.com` foi persistida como observações e finalizou como `succeeded`.
 - Monitor real: Celery Beat agendou a execução, worker processou a tarefa e o próximo vencimento foi atualizado.
 - `docker compose config --quiet` e configuração de produção passaram.
+- `caddy:2-alpine caddy validate` aprovou a configuração da borda HTTPS e do bloqueio de métricas.
 
 ## Riscos residuais e próximos passos
 
 1. Não houve pentest independente, DAST autenticado ou revisão externa de configuração de uma implantação pública.
 2. O teste de backup e restauração ainda precisa ser executado em um ambiente descartável com PostgreSQL e armazenamento de evidências, incluindo restauração após falha.
 3. A integração Meta depende de credenciais e permissões oficiais; não é declarada funcional sem elas. O adaptador Kali/MCP continua opcional e não concede privilégios de execução arbitrária.
-4. O endpoint Prometheus deve permanecer protegido pela rede/edge em produção; métricas não devem ser expostas diretamente à Internet.
+4. O endpoint Prometheus está bloqueado no Caddy e deve continuar protegido pela rede/edge em produção; métricas não devem ser expostas diretamente à Internet.
 5. A migração inicial usa `Base.metadata.create_all`; as próximas alterações devem ser migrações Alembic explícitas para garantir rollback e revisão de esquema.
 6. O `TestClient` de Starlette emite aviso de depreciação para `httpx`; a suíte passa, mas a migração para o cliente recomendado deve ser planejada antes da próxima atualização major.
 7. O transporte HTTP seguro usa um detalhe interno de `httpcore` para fixar resolução DNS. Uma atualização de `httpx/httpcore` deve ser acompanhada por testes de SSRF e de conexão TLS.
-8. A API possui membros de investigação no modelo e no controle de acesso; uma tela/API administrativa completa para adicionar, remover e revisar colaboradores deve ser concluída para cobrir toda a experiência de colaboração.
+8. A interface web ainda precisa expor todas as operações de colaboração adicionadas à API; o backend já aplica autorização do proprietário.
 
 ## Conclusão
 

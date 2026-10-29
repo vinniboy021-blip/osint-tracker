@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Auditoria profunda: corrigido isolamento entre investigações em agregados, busca, alertas e auditoria; rota administrativa de conectores passou a exigir RBAC; webhooks passaram a rejeitar destinos internos.
+- Auditoria de pré-produção: bloqueio de métricas ampliado no Caddy, endpoints de colaboradores adicionados com RBAC do proprietário e respostas administrativas sem hashes de senha.
 - Dependências Python e Next.js atualizadas e auditadas com `pip-audit`, Bandit e `npm audit` sem vulnerabilidades conhecidas.
 - Validados PostgreSQL/Redis reais, migrações reversíveis, coleta DNS, Celery Beat/worker e monitor recorrente; relatório detalhado em `docs/AUDIT.md`.
 - O endpoint `/ready` agora verifica PostgreSQL e Redis e retorna `503` quando uma dependência não está disponível.
