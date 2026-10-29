@@ -19,6 +19,7 @@ O arquivo `.env.example` descreve o ambiente Compose. Pydantic valida as variáv
 | `COLLECTION_MAX_RECORDS`, `COLLECTION_MAX_ATTEMPTS` | Limites por coleta e retries |
 | `WORKER_CONCURRENCY`, `SCHEDULER_TICK_SECONDS` | Concorrência e frequência do scheduler |
 | `AI_ENABLED`, `OLLAMA_URL`, `OLLAMA_MODEL` | Modelo local opcional; desabilitado por padrão |
+| `METRICS_ENABLED` | Habilita `/metrics/prometheus`; mantenha protegido na rede operacional |
 | `KALI_MCP_URL` | Endpoint MCP Kali administrado pelo operador; vazio desabilita a integração |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_STARTTLS`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` | Entrega opcional de alertas por e-mail |
 | `ALERT_WEBHOOK_URL`, `ALERT_WEBHOOK_SECRET` | Webhook opcional com assinatura HMAC SHA-256 |

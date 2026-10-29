@@ -28,6 +28,8 @@ Também é possível iniciar apenas com `cp .env.example .env` e `docker compose
 5. Revise os vínculos propostos e examine as relações persistidas no grafo.
 6. Adicione uma evidência de teste identificada como teste, verifique seu SHA-256 e exporte o relatório.
 
+Para colaborar, o responsável pode adicionar usuários por e-mail ou ID na API de membros da investigação; papéis `editor` e `viewer` são aplicados em todas as consultas e mutações.
+
 Uma fonte estável pode não mudar durante o teste: ausência de mudança não deve gerar alerta falso. A demonstração automatizada [scripts/demo_public.py](scripts/demo_public.py) consulta uma fonte real; os testes com fixtures permanecem separados. Veja [TESTING.md](TESTING.md).
 
 ## Operação e desenvolvimento
@@ -45,3 +47,5 @@ make up
 `make restore` substitui os dados configurados e pressupõe uma revisão do backup pelo operador. Backups pausam brevemente os serviços escritores para preservar consistência entre arquivos e banco. A chave de criptografia das configurações deve ser guardada separadamente.
 
 Para desenvolver, use Python 3.12+, Node.js 22 e `make install`. Consulte [INSTALLATION.md](INSTALLATION.md), [CONFIGURATION.md](CONFIGURATION.md), [API.md](API.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DEPLOYMENT.md](DEPLOYMENT.md), [SECURITY.md](SECURITY.md) e [ROADMAP.md](ROADMAP.md).
+
+O estado auditado, os comandos executados e os limites conhecidos estão em [docs/AUDIT.md](docs/AUDIT.md), [docs/VALIDATION.md](docs/VALIDATION.md) e [docs/IMPLEMENTATION_MATRIX.md](docs/IMPLEMENTATION_MATRIX.md).

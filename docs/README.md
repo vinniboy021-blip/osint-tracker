@@ -16,5 +16,7 @@ Este diretório contém os registros de implementação e validação. A documen
 - [TESTING](../TESTING.md): testes e pipeline CI.
 - [TROUBLESHOOTING](../TROUBLESHOOTING.md): diagnóstico.
 - [CONTRIBUTING](../CONTRIBUTING.md), [CHANGELOG](../CHANGELOG.md) e [ROADMAP](../ROADMAP.md).
+- [AUDIT](AUDIT.md): auditoria profunda, achados corrigidos e riscos residuais.
+- [IMPLEMENTATION_MATRIX](IMPLEMENTATION_MATRIX.md): estado por requisito.
 
 O estado verificável dos checks está em [VALIDATION.md](VALIDATION.md). Nenhum check remoto é marcado como aprovado sem execução real.
