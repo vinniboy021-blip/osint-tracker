@@ -67,19 +67,19 @@ jobs:
       - name: Validate Compose files
         env:
           POSTGRES_PASSWORD: ci-only-password
-          CONNECTOR_SECRET_KEY: QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=
+          CONNECTOR_SECRET_KEY: adJrwjmhUk0LJFTzUsHcafWvKmkOCIh9WI5ITbtxgDg=
           HOSTNAME: osint.example.org
           ACME_EMAIL: ci@example.org
         run: docker compose -f docker-compose.yml -f docker-compose.prod.yml config --quiet
       - name: Build production images
         env:
           POSTGRES_PASSWORD: ci-only-password
-          CONNECTOR_SECRET_KEY: QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=
+          CONNECTOR_SECRET_KEY: adJrwjmhUk0LJFTzUsHcafWvKmkOCIh9WI5ITbtxgDg=
         run: docker compose build --pull
       - name: Exercise backup and restore
         env:
           POSTGRES_PASSWORD: ci-only-password
-          CONNECTOR_SECRET_KEY: QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo=
+          CONNECTOR_SECRET_KEY: adJrwjmhUk0LJFTzUsHcafWvKmkOCIh9WI5ITbtxgDg=
         run: |
           trap 'docker compose down -v' EXIT
           docker compose up -d
