@@ -1,7 +1,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -386,14 +386,19 @@ def mark_alert(id: str, user: User = Depends(current_user), db: Session = Depend
 
 @router.post("/alerts/{id}/deliver")
 def deliver_alert(
-    id: str, recipient: str = "", user: User = Depends(current_user), db: Session = Depends(get_db)
+    id: str,
+    recipient: EmailStr = "",
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
 ):
     alert = db.get(Alert, id)
     if not alert:
         raise HTTPException(404, "Alerta não encontrado")
     investigation_access(db, user, alert.investigation_id, write=True)
     try:
-        result = deliver(alert, recipient)
+        result = deliver(alert, str(recipient) if recipient else "")
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     except Exception as exc:
         raise HTTPException(502, "Falha na entrega da notificação") from exc
     return {"alert_id": alert.id, "delivery": result}

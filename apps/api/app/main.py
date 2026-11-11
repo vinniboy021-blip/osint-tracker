@@ -4,6 +4,8 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from prometheus_client import make_asgi_app
 from redis import Redis
 from sqlalchemy import text
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app.auth import router as auth_router
@@ -15,6 +17,23 @@ from app.routes.core import router as core_router
 from app.routes.intelligence import router as intelligence_router
 from app.routes.kali import router as kali_router
 
+
+class _RealIPMiddleware(BaseHTTPMiddleware):
+    """Populate request.client with the real IP from X-Forwarded-For when the
+    immediate peer is a trusted reverse proxy (Caddy, in this deployment).
+    Only the first address in the header is used; the full chain is not trusted."""
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")
+        real_ip = forwarded_for[0].strip() if forwarded_for else ""
+        if real_ip:
+            # Replace the connection-level address so rate limiting and audit
+            # logging record the client IP, not the proxy's loopback address.
+            from starlette.datastructures import Address
+            request.scope["client"] = (real_ip, 0)
+        return await call_next(request)
+
+
 configure_logging()
 app = FastAPI(
     title="OSINT Tracker API",
@@ -24,6 +43,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
+app.add_middleware(_RealIPMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
