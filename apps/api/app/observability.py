@@ -39,9 +39,16 @@ def configure_logging() -> None:
     root.setLevel(logging.INFO)
 
 
+_REQUEST_ID_RE = __import__("re").compile(r"[^A-Za-z0-9\-_]")
+
+
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        request_id = request.headers.get("X-Request-ID") or str(uuid4())
+        raw_id = request.headers.get("X-Request-ID", "")
+        # Sanitize to alphanumeric + hyphen/underscore to prevent log injection
+        # and response-header injection via crafted X-Request-ID values.
+        sanitized = _REQUEST_ID_RE.sub("", raw_id)[:64]
+        request_id = sanitized if sanitized else str(uuid4())
         token = request_id_context.set(request_id)
         started = time.perf_counter()
         try:

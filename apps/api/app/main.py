@@ -1,3 +1,5 @@
+import ipaddress
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -18,19 +20,30 @@ from app.routes.intelligence import router as intelligence_router
 from app.routes.kali import router as kali_router
 
 
+def _is_trusted_proxy(host: str) -> bool:
+    """Return True only when the direct TCP peer is loopback or RFC-1918/ULA.
+    Caddy runs on the same host or on the same Docker network; public peers are
+    never trusted reverse proxies in this deployment."""
+    try:
+        addr = ipaddress.ip_address(host)
+        return addr.is_loopback or addr.is_private
+    except ValueError:
+        return False
+
+
 class _RealIPMiddleware(BaseHTTPMiddleware):
-    """Populate request.client with the real IP from X-Forwarded-For when the
-    immediate peer is a trusted reverse proxy (Caddy, in this deployment).
-    Only the first address in the header is used; the full chain is not trusted."""
+    """Populate request.client with the real IP from X-Forwarded-For only when
+    the direct TCP peer is a trusted reverse proxy (loopback or RFC-1918/ULA).
+    Accepts the leftmost address in the header; the full chain is not trusted.
+    Without this guard an attacker could spoof any IP to bypass rate limiting."""
 
     async def dispatch(self, request: Request, call_next):  # type: ignore[override]
-        forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")
-        real_ip = forwarded_for[0].strip() if forwarded_for else ""
-        if real_ip:
-            # Replace the connection-level address so rate limiting and audit
-            # logging record the client IP, not the proxy's loopback address.
-            from starlette.datastructures import Address
-            request.scope["client"] = (real_ip, 0)
+        peer = request.client.host if request.client else ""
+        if peer and _is_trusted_proxy(peer):
+            forwarded_for = request.headers.get("X-Forwarded-For", "")
+            real_ip = forwarded_for.split(",")[0].strip()
+            if real_ip:
+                request.scope["client"] = (real_ip, 0)
         return await call_next(request)
 
 
