@@ -1,15 +1,143 @@
-# API REST e OpenAPI
+# API REST
 
-FastAPI disponibiliza `/docs` e `/openapi.json`. O contrato exato de rotas, campos, enums e validações pode ser inspecionado nesses endpoints; não mantenha uma cópia manual divergente do schema. As rotas funcionais usam `/api/v1`.
+FastAPI expõe o contrato completo em `/docs` (Swagger UI) e `/openapi.json`. O schema é a fonte de verdade para campos, enums e validações — não mantenha uma cópia manual divergente. Todas as rotas funcionais usam o prefixo `/api/v1`.
 
-O Next.js encaminha chamadas da mesma origem para a API pelo endereço interno. Cookies de sessão são HttpOnly; requisições de escrita usam o mecanismo CSRF exigido pelo backend. Tokens e credenciais não devem ser copiados para URLs, logs ou parâmetros de linha de comando.
+## Autenticação e sessão
 
-Grupos de recursos: autenticação/sessão; usuários/administração; investigações e colaboradores; conectores; jobs/coletas/execuções; monitores; observações e pesquisa; entidades/correlações/revisões/grafo; evidências/versões/integridade/download; timeline/alertas; threat intelligence; análises de IA; relatórios/auditoria.
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `POST` | `/api/v1/auth/login` | Autentica e retorna cookie de sessão + `csrf_token` |
+| `GET` | `/api/v1/auth/me` | Retorna usuário atual e renova `csrf_token` |
+| `POST` | `/api/v1/auth/logout` | Revoga sessão atual |
+| `POST` | `/api/v1/auth/logout-all` | Revoga todas as sessões do usuário |
 
-Respostas de listagem têm limites e paginação definidos pelo contrato. Erros de validação são 422; ausência de autenticação, 401; falta de permissão, 403 ou 404 para objetos fora do escopo; indisponibilidade de dependência ou integração deve aparecer como erro explícito, sem dados fictícios.
+Cookies de sessão são `HttpOnly`; requisições de escrita (`POST`, `PATCH`, `PUT`, `DELETE`) exigem o header `X-CSRF-Token` com o valor retornado em `/me` ou `/login`.
 
-Health sem dados sensíveis: `/health/live` verifica o processo; `/health/ready` verifica dependências. Os aliases `/live` e `/ready` simplificam operação. `/metrics/prometheus` fornece Prometheus quando habilitado; mantenha esse endpoint dentro da rede de operação e bloqueado na borda pública.
+## Usuários e administração
 
-Colaboração usa `GET /api/v1/investigations/{id}/members`, `POST /api/v1/investigations/{id}/members` com `email` ou `user_id` e papel `editor`/`viewer`, e `DELETE /api/v1/investigations/{id}/members/{user_id}`. Somente o proprietário da investigação ou administrador pode alterar membros; o backend nunca retorna hashes de senha.
+| Método | Rota | Acesso |
+|--------|------|--------|
+| `GET` | `/api/v1/admin/users` | admin |
+| `POST` | `/api/v1/admin/users` | admin |
+| `GET` | `/api/v1/admin/connectors` | admin |
+| `GET` | `/api/v1/admin/kali/health` | admin |
 
-O script [scripts/demo_public.py](scripts/demo_public.py) usa o contrato de autenticação e coleta para uma demonstração real. Cliente e testes E2E mantêm os mesmos nomes dos endpoints.
+## Investigações e colaboradores
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/api/v1/investigations` | Lista investigações do usuário |
+| `POST` | `/api/v1/investigations` | Cria investigação |
+| `GET` | `/api/v1/investigations/{id}` | Detalha investigação |
+| `GET` | `/api/v1/investigations/{id}/members` | Lista colaboradores |
+| `POST` | `/api/v1/investigations/{id}/members` | Adiciona colaborador (`editor`/`viewer`) por `user_id` ou `email` |
+| `DELETE` | `/api/v1/investigations/{id}/members/{user_id}` | Remove colaborador |
+
+Somente o proprietário ou `admin` podem gerenciar colaboradores.
+
+## Conectores
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/api/v1/connectors` | Lista conectores com status de saúde |
+| `PATCH` | `/api/v1/connectors/{id}` | Habilita/desabilita conector (admin) |
+| `PUT` | `/api/v1/connectors/{id}/configuration` | Configura credenciais criptografadas (admin) |
+
+## Coleta e monitoramento
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `POST` | `/api/v1/jobs` | Cria job de coleta |
+| `GET` | `/api/v1/jobs` | Lista jobs (com filtros de status, conector, monitor) |
+| `GET` | `/api/v1/jobs/{id}` | Detalha job e execuções |
+| `POST` | `/api/v1/jobs/{id}/cancel` | Cancela job ativo |
+| `POST` | `/api/v1/jobs/{id}/retry` | Reenfileira job cancelado ou com falha |
+| `POST` | `/api/v1/monitors` | Cria monitor recorrente (intervalo ou cron UTC) |
+| `GET` | `/api/v1/monitors` | Lista monitores |
+| `PATCH` | `/api/v1/monitors/{id}` | Atualiza ou pausa monitor |
+| `POST` | `/api/v1/monitors/{id}/run` | Dispara execução imediata |
+| `POST` | `/api/v1/social-profiles` | Cria perfil social com monitor opcional |
+| `GET` | `/api/v1/social-profiles` | Lista perfis sociais |
+
+## Observações, entidades e busca
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/api/v1/observations` | Lista observações de uma investigação |
+| `POST` | `/api/v1/entities` | Cria entidade manualmente |
+| `GET` | `/api/v1/entities` | Lista entidades |
+| `GET` | `/api/v1/search` | Busca por entidades, observações e indicadores persistidos |
+| `GET` | `/api/v1/timeline` | Timeline de eventos da investigação |
+
+## Correlação e grafo
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/api/v1/correlations` | Lista candidatos de correlação |
+| `POST` | `/api/v1/correlations/suggest` | Gera sugestões automáticas de correlação |
+| `POST` | `/api/v1/correlations/{id}/review` | Revisa candidato (confirmed/rejected/unverified) |
+| `GET` | `/api/v1/graph` | Grafo de entidades e relações (paginado) |
+| `GET` | `/api/v1/graph/path` | Caminho mais curto entre duas entidades (somente `confirmed`) |
+
+## Evidências
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `POST` | `/api/v1/evidence` | Upload de arquivo (multipart); retorna SHA-256 |
+| `GET` | `/api/v1/evidence` | Lista evidências |
+| `GET` | `/api/v1/evidence/{id}/download` | Download seguro com `Content-Disposition: attachment` |
+| `POST` | `/api/v1/evidence/{id}/verify` | Verifica integridade SHA-256 |
+| `GET` | `/api/v1/evidence/{id}/versions` | Lista versões |
+| `POST` | `/api/v1/evidence/{id}/versions` | Adiciona nova versão |
+| `DELETE` | `/api/v1/evidence/{id}` | Expurga evidência e todas as versões |
+
+## Threat intelligence
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `POST` | `/api/v1/threat-indicators` | Registra indicador (ip, domain, sha256, url) |
+| `GET` | `/api/v1/threat-indicators` | Lista indicadores |
+| `GET` | `/api/v1/threat-indicators/export` | Exporta em JSON ou CSV |
+
+## Alertas
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/api/v1/alerts` | Lista alertas (com filtro por investigação) |
+| `PATCH` | `/api/v1/alerts/{id}` | Marca alerta como lido |
+| `POST` | `/api/v1/alerts/{id}/deliver` | Envia alerta por e-mail (parâmetro `recipient` — endereço válido obrigatório) |
+
+## Relatórios e IA
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `POST` | `/api/v1/reports` | Gera relatório (json, csv, md) |
+| `GET` | `/api/v1/reports` | Lista relatórios |
+| `GET` | `/api/v1/reports/{id}/download` | Download do relatório |
+| `POST` | `/api/v1/ai/analyze` | Análise extrativa com citações (Ollama opcional) |
+| `GET` | `/api/v1/ai/runs` | Lista execuções de IA |
+
+## Workspace e auditoria
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `POST` | `/api/v1/workspace-items` | Cria item de workspace (hypothesis/observation/task) |
+| `GET` | `/api/v1/workspace-items` | Lista itens |
+| `GET` | `/api/v1/audit` | Log de auditoria da investigação ou do escopo do usuário |
+
+## Saúde e métricas
+
+| Rota | Descrição |
+|------|-----------|
+| `/health/live` ou `/live` | Liveness: verifica o processo |
+| `/health/ready` ou `/ready` | Readiness: verifica PostgreSQL e Redis; retorna `503` se indisponível |
+| `/metrics/prometheus` | Métricas Prometheus (proteger na rede operacional; não expor publicamente) |
+
+## Convenções
+
+- Paginação: parâmetros `skip`/`offset` e `limit` em rotas de listagem. Limite máximo varia por rota (50–200).
+- Erros de validação: `422 Unprocessable Entity`.
+- Sem autenticação: `401 Unauthorized`.
+- Sem permissão ou fora do escopo: `403 Forbidden` ou `404 Not Found` (objetos fora do escopo retornam 404 para não confirmar existência).
+- Indisponibilidade de dependência: `502` ou `503` com mensagem explícita.
+- Tokens e credenciais nunca devem ser copiados para URLs, logs ou parâmetros de query string.
